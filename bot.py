@@ -134,9 +134,8 @@ async def main():
     except Exception as e:
         print("Cannot access BIN_CHANNEL. Add the bot as admin there:", e)
     app = web.Application()
-    app.add_routes([web.get("/", health),
-                    web.get("/dl/{id}/{sig}", download),
-                    web.head("/dl/{id}/{sig}", download)])
+        app.add_routes([web.get("/", health),
+                    web.get("/dl/{id}/{sig}", download)])
     runner = web.AppRunner(app)
     await runner.setup()
     await web.TCPSite(runner, "0.0.0.0", PORT).start()
