@@ -1,6 +1,8 @@
 import os, re, hmac, hashlib, asyncio, logging
 from urllib.parse import quote
+import aiohttp
 from aiohttp import web
+from pyrogram.handlers import RawUpdateHandler
 from pyrogram import Client, filters
 
 logging.basicConfig(level=logging.INFO)
@@ -139,7 +141,25 @@ async def health(_):
     return web.Response(text="ok")
 
 
+async def raw_log(client, update, users, chats):
+    print("RAW UPDATE:", type(update).__name__, flush=True)
+
+
+async def check_webhook():
+    base = f"https://api.telegram.org/bot{BOT_TOKEN}"
+    try:
+        async with aiohttp.ClientSession() as s:
+            async with s.get(base + "/getWebhookInfo") as r:
+                print("Webhook info:", await r.text(), flush=True)
+            async with s.get(base + "/deleteWebhook") as r:
+                print("deleteWebhook:", await r.text(), flush=True)
+    except Exception as e:
+        print("webhook check failed:", repr(e), flush=True)
+
+
 async def main():
+    await check_webhook()
+    bot.add_handler(RawUpdateHandler(raw_log), group=-2)
     await bot.start()
     me = await bot.get_me()
     print("Logged in as @" + str(me.username), flush=True)
