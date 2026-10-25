@@ -9,7 +9,6 @@ API_ID = int(os.environ["API_ID"])
 API_HASH = os.environ["API_HASH"]
 BOT_TOKEN = os.environ["BOT_TOKEN"]
 BIN_CHANNEL = int(os.environ["BIN_CHANNEL"])   # private channel id, e.g. -100123...
-OWNER_ID = int(os.environ["OWNER_ID"])         # your Telegram user id
 BASE_URL = os.environ["BASE_URL"].rstrip("/")  # e.g. https://myapp.onrender.com
 SECRET = os.environ.get("SECRET", BOT_TOKEN).encode()
 PORT = int(os.environ.get("PORT", 8080))
@@ -40,26 +39,36 @@ def file_name(media, kind, msg_id):
     return f"file_{msg_id}{ext}"
 
 
-@bot.on_message(filters.private & ~filters.user(OWNER_ID))
-async def deny(_, m):
-    print("Denied user id:", m.from_user.id if m.from_user else None, flush=True)
-    await m.reply_text("Private bot.")
+@bot.on_message(filters.all, group=-1)
+async def log_all(_, m):
+    print("GOT MESSAGE from", m.from_user.id if m.from_user else None,
+          "| chat", m.chat.id if m.chat else None, "|", m.text or m.media, flush=True)
+    m.continue_propagation()
 
 
-@bot.on_message(filters.private & filters.user(OWNER_ID) & filters.command("start"))
+@bot.on_message(filters.private & filters.command("ping"))
+async def ping(_, m):
+    await m.reply_text("pong")
+
+
+@bot.on_message(filters.private & filters.command("start"))
 async def start(_, m):
     await m.reply_text("Send or forward me any file and I'll give you a download link.")
 
 
-@bot.on_message(filters.private & filters.user(OWNER_ID) &
+@bot.on_message(filters.private &
                 (filters.document | filters.video | filters.audio | filters.voice |
                  filters.animation | filters.video_note | filters.photo))
 async def handle(_, m):
-    copied = await m.copy(BIN_CHANNEL)
-    media, kind = get_media(copied)
-    name = file_name(media, kind, copied.id)
-    link = f"{BASE_URL}/dl/{copied.id}/{sign(copied.id)}"
-    await m.reply_text(f"`{name}`\n\n{link}", quote=True)
+    try:
+        copied = await m.copy(BIN_CHANNEL)
+        media, kind = get_media(copied)
+        name = file_name(media, kind, copied.id)
+        link = f"{BASE_URL}/dl/{copied.id}/{sign(copied.id)}"
+        await m.reply_text(f"`{name}`\n\n{link}", quote=True)
+    except Exception as e:
+        print("handle error:", repr(e), flush=True)
+        await m.reply_text(f"Error: {e!r}")
 
 
 async def download(request: web.Request):
@@ -133,7 +142,7 @@ async def health(_):
 async def main():
     await bot.start()
     me = await bot.get_me()
-    print("Logged in as @" + str(me.username), "| OWNER_ID =", OWNER_ID, flush=True)
+    print("Logged in as @" + str(me.username), flush=True)
     try:
         await bot.get_chat(BIN_CHANNEL)
     except Exception as e:
